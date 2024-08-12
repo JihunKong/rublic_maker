@@ -173,7 +173,7 @@ curriculum_standards = {
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
@@ -185,6 +185,8 @@ def get_gpt_response(prompt):
 
 def generate_rubric_table(criteria_list):
     rubric_data = {}
+    levels = ["최상", "상", "중", "하", "최하"]
+    
     for criteria in criteria_list:
         prompt = f"""
         다음 평가 기준에 대한 서술식 5단계 루브릭을 작성해주세요:
@@ -198,11 +200,10 @@ def generate_rubric_table(criteria_list):
         descriptions = rubric_text.splitlines()
         
         # 정확히 5개의 설명이 제공되지 않았다면 기본 메시지로 채우기
-        levels = ["최상", "상", "중", "하", "최하"]
         if len(descriptions) != 5:
             descriptions = descriptions[:5] + ["(설명이 부족합니다. 여기에 추가 설명을 작성하십시오.)"] * (5 - len(descriptions))
 
-        rubric_data[criteria] = descriptions
+        rubric_data[criteria] = dict(zip(levels, descriptions))
 
     return rubric_data
 
@@ -251,20 +252,18 @@ def main():
             criteria_list = fill_missing_criteria(criteria_list)
             with st.spinner('루브릭을 생성 중입니다...'):
                 rubric_data = generate_rubric_table(criteria_list)
+            
             st.markdown("## 생성된 루브릭")
 
-            for criteria, descriptions in rubric_data.items():
-                st.markdown(f"### {criteria}")
-                df = pd.DataFrame({
-                    "레벨": ["최상", "상", "중", "하", "최하"],
-                    "설명": descriptions
-                })
-                st.table(df)
+            # 통합된 루브릭 표 생성
+            df = pd.DataFrame(rubric_data).T
+            df = df.reset_index()
+            df.columns = ['평가 기준'] + list(df.columns[1:])
+            st.table(df)
 
             # CSV 파일로 저장
             csv_buffer = BytesIO()
-            df_all = pd.concat([pd.DataFrame({"기준": [criteria] * 5, "레벨": ["최상", "상", "중", "하", "최하"], "설명": descriptions}) for criteria, descriptions in rubric_data.items()])
-            df_all.to_csv(csv_buffer, index=False)
+            df.to_csv(csv_buffer, index=False)
             csv_buffer.seek(0)
 
             st.download_button(
