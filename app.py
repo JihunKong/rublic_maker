@@ -3,7 +3,7 @@ from openai import OpenAI
 import json
 from io import BytesIO
 import re
-import BeautifulSoup
+from bs4 import BeautifulSoup
 
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
