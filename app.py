@@ -1,13 +1,13 @@
 import streamlit as st
 from openai import OpenAI
-import pandas as pd
-from io import BytesIO
 import json
+from io import BytesIO
+import re
 
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
-# 교육과정 데이터
+# 교육과정 데이터 (이전과 동일)
 curriculum_standards = {
     "중학교": {
         "듣기·말하기": [
@@ -170,10 +170,11 @@ curriculum_standards = {
     }
 }
 
+
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
@@ -184,28 +185,32 @@ def get_gpt_response(prompt):
         return f"오류가 발생했습니다: {str(e)}"
 
 def generate_rubric_table(criteria_list):
-    rubric_data = {}
-    levels = ["최상", "상", "중", "하", "최하"]
+    prompt = f"""
+    다음 평가 기준들에 대한 루브릭 표를 작성해주세요:
     
-    for criteria in criteria_list:
-        prompt = f"""
-        다음 평가 기준에 대한 서술식 5단계 루브릭을 작성해주세요:
-        
-        평가 기준: {criteria}
-        
-        각 항목에 대해 긍정적인 표현을 사용하여 설명하고, 최상, 상, 중, 하, 최하 순으로, 진술을 더 상세하고 길게 작성해주세요.
-        """
+    {', '.join(criteria_list)}
+    
+    루브릭 표는 다음 형식을 따라야 합니다:
+    1. 첫 번째 열은 평가 기준입니다.
+    2. 나머지 열은 '최상', '상', '중', '하', '최하' 순서로 평가 척도를 나타냅니다.
+    3. 각 셀에는 해당 평가 기준과 척도에 맞는 상세한 설명을 작성해주세요.
+    4. 표는 마크다운 형식으로 작성해주세요.
+    5. 모든 평가 기준과 척도에 대해 빠짐없이 작성해주세요.
+    
+    긍정적인 표현을 사용하여 각 항목을 상세하고 길게 설명해주세요.
+    """
 
-        rubric_text = get_gpt_response(prompt)
-        descriptions = rubric_text.splitlines()
-        
-        # 정확히 5개의 설명이 제공되지 않았다면 기본 메시지로 채우기
-        if len(descriptions) != 5:
-            descriptions = descriptions[:5] + ["(설명이 부족합니다. 여기에 추가 설명을 작성하십시오.)"] * (5 - len(descriptions))
+    return get_gpt_response(prompt)
 
-        rubric_data[criteria] = dict(zip(levels, descriptions))
-
-    return rubric_data
+def parse_markdown_table(markdown_table):
+    lines = markdown_table.strip().split('\n')
+    headers = [header.strip() for header in re.findall(r'\|(.+?)\|', lines[0])]
+    data = []
+    for line in lines[2:]:  # Skip the header separator line
+        row = [cell.strip() for cell in re.findall(r'\|(.+?)\|', line)]
+        if row:
+            data.append(dict(zip(headers, row)))
+    return data
 
 def fill_missing_criteria(criteria_list, total_criteria=5):
     if len(criteria_list) < total_criteria:
@@ -251,27 +256,13 @@ def main():
         else:
             criteria_list = fill_missing_criteria(criteria_list)
             with st.spinner('루브릭을 생성 중입니다...'):
-                rubric_data = generate_rubric_table(criteria_list)
+                markdown_table = generate_rubric_table(criteria_list)
             
             st.markdown("## 생성된 루브릭")
+            st.markdown(markdown_table)
 
-            # 통합된 루브릭 표 생성
-            df = pd.DataFrame(rubric_data).T
-            df = df.reset_index()
-            df.columns = ['평가 기준'] + list(df.columns[1:])
-            st.table(df)
-
-            # CSV 파일로 저장
-            csv_buffer = BytesIO()
-            df.to_csv(csv_buffer, index=False)
-            csv_buffer.seek(0)
-
-            st.download_button(
-                label="CSV 다운로드",
-                data=csv_buffer,
-                file_name="rubric.csv",
-                mime="text/csv"
-            )
+            # 마크다운 테이블을 JSON으로 변환
+            rubric_data = parse_markdown_table(markdown_table)
 
             # JSON 파일로 저장
             json_buffer = BytesIO()
