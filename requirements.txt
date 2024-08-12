@@ -2,4 +2,4 @@ streamlit
 openai
 pandas
 fpdf
-BeautifulSoup
+BeautifulSoup4
