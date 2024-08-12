@@ -2,11 +2,12 @@ import streamlit as st
 from openai import OpenAI
 import pandas as pd
 from io import BytesIO
-from fpdf import FPDF
+import json
 
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
+# 교육과정 데이터
 curriculum_standards = {
     "중학교": {
         "듣기·말하기": [
@@ -169,13 +170,6 @@ curriculum_standards = {
     }
 }
 
-
-def clean_text_for_pdf(text):
-    """
-    이 함수는 텍스트를 PDF에 안전하게 삽입하기 위해 latin-1 인코딩이 불가능한 문자를 제거합니다.
-    """
-    return text.encode('latin1', 'replace').decode('latin1')
-
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
@@ -208,8 +202,6 @@ def generate_rubric_table(criteria_list):
         if len(descriptions) != 5:
             descriptions = descriptions[:5] + ["(설명이 부족합니다. 여기에 추가 설명을 작성하십시오.)"] * (5 - len(descriptions))
 
-        # 텍스트를 PDF에 안전하게 넣을 수 있도록 클리닝
-        descriptions = [clean_text_for_pdf(desc) for desc in descriptions]
         rubric_data[criteria] = descriptions
 
     return rubric_data
@@ -230,29 +222,6 @@ def fill_missing_criteria(criteria_list, total_criteria=5):
         criteria_list.extend([criteria for criteria in gpt_generated_criteria if criteria])
 
     return criteria_list[:total_criteria]  # Ensure the list is exactly the required length
-
-def create_pdf(rubric_data):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-
-    for criteria, descriptions in rubric_data.items():
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(200, 10, txt=clean_text_for_pdf(criteria), ln=True, align='C')
-
-        pdf.set_font("Arial", size=12)
-        pdf.cell(40, 10, txt="레벨", border=1)
-        pdf.cell(150, 10, txt="설명", border=1, ln=True)
-
-        levels = ["최상", "상", "중", "하", "최하"]
-        for level, description in zip(levels, descriptions):
-            pdf.cell(40, 10, txt=clean_text_for_pdf(level), border=1)
-            pdf.multi_cell(150, 10, txt=description, border=1)
-
-        pdf.ln(10)
-
-    return pdf
 
 def main():
     st.title("루브릭 생성기")
@@ -292,16 +261,30 @@ def main():
                 })
                 st.table(df)
 
-            pdf = create_pdf(rubric_data)
-            pdf_buffer = BytesIO()
-            pdf.output(pdf_buffer)
-            pdf_buffer.seek(0)
+            # CSV 파일로 저장
+            csv_buffer = BytesIO()
+            df_all = pd.concat([pd.DataFrame({"기준": [criteria] * 5, "레벨": ["최상", "상", "중", "하", "최하"], "설명": descriptions}) for criteria, descriptions in rubric_data.items()])
+            df_all.to_csv(csv_buffer, index=False)
+            csv_buffer.seek(0)
 
             st.download_button(
-                label="PDF 다운로드",
-                data=pdf_buffer,
-                file_name="rubric.pdf",
-                mime="application/pdf"
+                label="CSV 다운로드",
+                data=csv_buffer,
+                file_name="rubric.csv",
+                mime="text/csv"
+            )
+
+            # JSON 파일로 저장
+            json_buffer = BytesIO()
+            json_data = json.dumps(rubric_data, ensure_ascii=False, indent=4)
+            json_buffer.write(json_data.encode('utf-8'))
+            json_buffer.seek(0)
+
+            st.download_button(
+                label="JSON 다운로드",
+                data=json_buffer,
+                file_name="rubric.json",
+                mime="application/json"
             )
 
 if __name__ == "__main__":
