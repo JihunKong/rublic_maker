@@ -211,7 +211,7 @@ def parse_markdown_table(markdown_table):
             data.append(dict(zip(headers, row)))
     return data
 
-def fill_missing_criteria(criteria_list, total_criteria=5):
+def fill_missing_criteria(criteria_list, total_criteria=4):
     if len(criteria_list) < total_criteria:
         missing_count = total_criteria - len(criteria_list)
         st.info(f"입력되지 않은 평가 기준 {missing_count}개는 자동으로 생성됩니다.")
