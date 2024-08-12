@@ -3,7 +3,6 @@ from openai import OpenAI
 import json
 from io import BytesIO
 import re
-import pandas as pd
 
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
@@ -176,7 +175,7 @@ curriculum_standards = {
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
@@ -198,21 +197,20 @@ def generate_rubric_table(criteria_list):
     2. 그 다음 4개의 행은 각각 하나의 평가 기준에 대한 내용을 포함해야 합니다.
     3. 각 셀에는 해당 평가 기준과 척도에 맞는 상세한 설명을 작성해주세요.
     4. 표는 마크다운 형식으로 작성해주세요.
-    5. 모든 4개의 평가 기준과 5개의 척도에 대해 빠짐없이 작성해주세요.
-    
-    긍정적인 표현을 사용하여 각 항목을 상세하고 길게 설명해주세요.
+    5. 각 척도에 대한 설명은 명확하고 구체적이어야 하며, 사용자의 입력을 최대한 반영해야 합니다.
+    6. 항목은 완벽히 채워져야 하며, 빈칸이 없어야 합니다.
     """
 
     return get_gpt_response(prompt)
 
-# 마크다운 테이블에서 데이터를 추출하여 JSON으로 변환하는 함수
+# 마크다운 표를 JSON으로 변환하는 함수
 def parse_markdown_table(markdown_table):
     lines = markdown_table.strip().split('\n')
     headers = [header.strip() for header in re.findall(r'\|(.+?)\|', lines[0])]
     data = []
     for line in lines[2:]:  # Skip the header separator line
         row = [cell.strip() for cell in re.findall(r'\|(.+?)\|', line)]
-        if row:
+        if row and len(row) == len(headers):  # Ensure the row matches the headers
             data.append(dict(zip(headers, row)))
     return data
 
@@ -243,10 +241,10 @@ def main():
     standard = st.selectbox("교육과정 성취기준 선택", curriculum_standards[school_level][subject])
 
     # 활동 입력
-    activity = st.text_area("학습 목표", "예: 공감적 대화하기의 요소를 이해하고 일상 생활에 적용할 수 있다.")
+    activity = st.text_area("활동 입력", "예: 설득력 있는 글쓰기")
 
     # 평가 기준 입력
-    st.subheader("평가 기준 입력")
+    st.subheader("평가 기준 입력 (정확히 4개)")
     criteria_inputs = [st.text_input(f"평가 기준 {i+1}", "") for i in range(4)]
 
     criteria_list = [criteria for criteria in criteria_inputs if criteria]
@@ -260,7 +258,7 @@ def main():
                 markdown_table = generate_rubric_table(criteria_list)
             
             st.markdown("## 생성된 루브릭")
-            st.markdown(markdown_table)  # 마크다운 표를 올바르게 렌더링
+            st.markdown(f"```markdown\n{markdown_table}\n```")  # 마크다운 표를 올바르게 렌더링
 
             # 마크다운 테이블을 JSON으로 변환
             rubric_data = parse_markdown_table(markdown_table)
