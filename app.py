@@ -7,6 +7,7 @@ import re
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
+# 교육과정 데이터 설정
 curriculum_standards = {
     "중학교": {
         "듣기·말하기": [
@@ -169,6 +170,7 @@ curriculum_standards = {
     }
 }
 
+# GPT 응답 가져오기 함수
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
@@ -182,6 +184,7 @@ def get_gpt_response(prompt):
     except Exception as e:
         return f"오류가 발생했습니다: {str(e)}"
 
+# 루브릭 표 생성 함수
 def generate_rubric_table(criteria_list):
     prompt = f"""
     다음 4개의 평가 기준에 대한 루브릭 표를 작성해주세요:
@@ -192,24 +195,25 @@ def generate_rubric_table(criteria_list):
     1. 첫 번째 행은 열 제목으로, '평가 기준', '최상', '상', '중', '하', '최하'를 포함해야 합니다.
     2. 그 다음 4개의 행은 각각 하나의 평가 기준에 대한 내용을 포함해야 합니다.
     3. 각 셀에는 해당 평가 기준과 척도에 맞는 상세한 설명을 작성해주세요.
-    4. 표는 마크다운 형식으로 작성해주세요. 마크다운이 제대로 생성되도록 다른 언어적 응답은 제외하고 바로 시작하세요.
-    5. 모든 4개의 평가 기준과 5개의 척도에 대해 빠짐없이 작성해주세요.
-    
-    긍정적인 표현을 사용하여 각 항목을 상세하고 길게 설명해주세요.
+    4. 표는 마크다운 형식으로 작성해주세요. 마크다운 형식이 잘 실행될 수 있도록 다른 표현을 사용하지 마세요.
+    5. 각 척도에 대한 설명은 명확하고 구체적이어야 하며, 사용자의 입력을 최대한 반영해야 합니다.
+    6. 항목은 완벽히 채워져야 하며, 빈칸이 없어야 합니다.
     """
 
     return get_gpt_response(prompt)
 
+# 마크다운 표를 JSON으로 변환하는 함수
 def parse_markdown_table(markdown_table):
     lines = markdown_table.strip().split('\n')
     headers = [header.strip() for header in re.findall(r'\|(.+?)\|', lines[0])]
     data = []
     for line in lines[2:]:  # Skip the header separator line
         row = [cell.strip() for cell in re.findall(r'\|(.+?)\|', line)]
-        if row:
+        if row and len(row) == len(headers):  # Ensure the row matches the headers
             data.append(dict(zip(headers, row)))
     return data
 
+# 평가 기준이 부족할 경우 자동으로 추가하는 함수
 def fill_missing_criteria(criteria_list, total_criteria=4):
     if len(criteria_list) < total_criteria:
         missing_count = total_criteria - len(criteria_list)
@@ -239,7 +243,7 @@ def main():
     activity = st.text_area("활동 입력", "예: 설득력 있는 글쓰기")
 
     # 평가 기준 입력
-    st.subheader("평가 기준 입력 (정확히 4개)")
+    st.subheader("평가 기준 입력")
     criteria_inputs = [st.text_input(f"평가 기준 {i+1}", "") for i in range(4)]
 
     criteria_list = [criteria for criteria in criteria_inputs if criteria]
