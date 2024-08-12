@@ -170,6 +170,7 @@ curriculum_standards = {
     }
 }
 
+
 # GPT 응답 가져오기 함수
 def get_gpt_response(prompt):
     try:
@@ -195,22 +196,27 @@ def generate_rubric_table(criteria_list):
     1. 첫 번째 행은 열 제목으로, '평가 기준', '최상', '상', '중', '하', '최하'를 포함해야 합니다.
     2. 그 다음 4개의 행은 각각 하나의 평가 기준에 대한 내용을 포함해야 합니다.
     3. 각 셀에는 해당 평가 기준과 척도에 맞는 상세한 설명을 작성해주세요.
-    4. 표는 마크다운 형식으로 작성해주세요. 마크다운 형식이 잘 실행될 수 있도록 다른 표현을 사용하지 마세요.
+    4. 표는 HTML 형식으로 작성해주세요.
     5. 각 척도에 대한 설명은 명확하고 구체적이어야 하며, 사용자의 입력을 최대한 반영해야 합니다.
     6. 항목은 완벽히 채워져야 하며, 빈칸이 없어야 합니다.
     """
 
     return get_gpt_response(prompt)
 
-# 마크다운 표를 JSON으로 변환하는 함수
-def parse_markdown_table(markdown_table):
-    lines = markdown_table.strip().split('\n')
-    headers = [header.strip() for header in re.findall(r'\|(.+?)\|', lines[0])]
+# HTML 표에서 데이터를 JSON으로 변환하는 함수
+def parse_html_table_to_json(html_table):
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html_table, "html.parser")
+    headers = [header.text.strip() for header in soup.find_all('th')]
+    rows = soup.find_all('tr')[1:]  # 첫 번째 행은 헤더이므로 제외
+
     data = []
-    for line in lines[2:]:  # Skip the header separator line
-        row = [cell.strip() for cell in re.findall(r'\|(.+?)\|', line)]
-        if row and len(row) == len(headers):  # Ensure the row matches the headers
-            data.append(dict(zip(headers, row)))
+    for row in rows:
+        cells = row.find_all('td')
+        if len(cells) == len(headers):
+            data.append({headers[i]: cells[i].text.strip() for i in range(len(headers))})
+
     return data
 
 # 평가 기준이 부족할 경우 자동으로 추가하는 함수
@@ -254,13 +260,13 @@ def main():
         else:
             criteria_list = fill_missing_criteria(criteria_list)
             with st.spinner('루브릭을 생성 중입니다...'):
-                markdown_table = generate_rubric_table(criteria_list)
+                html_table = generate_rubric_table(criteria_list)
             
             st.markdown("## 생성된 루브릭")
-            st.markdown(f"```markdown\n{markdown_table}\n```")  # 마크다운 표를 올바르게 렌더링
+            st.markdown(html_table, unsafe_allow_html=True)  # HTML 표를 올바르게 렌더링
 
-            # 마크다운 테이블을 JSON으로 변환
-            rubric_data = parse_markdown_table(markdown_table)
+            # HTML 표를 JSON으로 변환
+            rubric_data = parse_html_table_to_json(html_table)
 
             # JSON 파일로 저장
             json_buffer = BytesIO()
