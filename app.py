@@ -170,12 +170,18 @@ curriculum_standards = {
 }
 
 
+def clean_text_for_pdf(text):
+    """
+    이 함수는 텍스트를 PDF에 안전하게 삽입하기 위해 latin-1 인코딩이 불가능한 문자를 제거합니다.
+    """
+    return text.encode('latin1', 'replace').decode('latin1')
+
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4",
             messages=[
-                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 하, 최하의 척도에도 발전이 기대된다. 노력이 필요하다 등의 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
+                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -202,6 +208,8 @@ def generate_rubric_table(criteria_list):
         if len(descriptions) != 5:
             descriptions = descriptions[:5] + ["(설명이 부족합니다. 여기에 추가 설명을 작성하십시오.)"] * (5 - len(descriptions))
 
+        # 텍스트를 PDF에 안전하게 넣을 수 있도록 클리닝
+        descriptions = [clean_text_for_pdf(desc) for desc in descriptions]
         rubric_data[criteria] = descriptions
 
     return rubric_data
@@ -231,7 +239,7 @@ def create_pdf(rubric_data):
 
     for criteria, descriptions in rubric_data.items():
         pdf.set_font("Arial", 'B', 14)
-        pdf.cell(200, 10, txt=criteria, ln=True, align='C')
+        pdf.cell(200, 10, txt=clean_text_for_pdf(criteria), ln=True, align='C')
 
         pdf.set_font("Arial", size=12)
         pdf.cell(40, 10, txt="레벨", border=1)
@@ -239,7 +247,7 @@ def create_pdf(rubric_data):
 
         levels = ["최상", "상", "중", "하", "최하"]
         for level, description in zip(levels, descriptions):
-            pdf.cell(40, 10, txt=level, border=1)
+            pdf.cell(40, 10, txt=clean_text_for_pdf(level), border=1)
             pdf.multi_cell(150, 10, txt=description, border=1)
 
         pdf.ln(10)
