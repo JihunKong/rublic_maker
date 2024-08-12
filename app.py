@@ -241,7 +241,7 @@ def main():
 
     # 평가 기준 입력
     st.subheader("평가 기준 입력")
-    criteria_inputs = [st.text_input(f"평가 기준 {i+1}", "") for i in range(5)]
+    criteria_inputs = [st.text_input(f"평가 기준 {i+1}", "") for i in range(4)]
 
     criteria_list = [criteria for criteria in criteria_inputs if criteria]
 
