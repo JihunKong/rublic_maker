@@ -1,10 +1,13 @@
 import streamlit as st
 from openai import OpenAI
+import pandas as pd
+from io import BytesIO
+from fpdf import FPDF
 
+# OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
-
-# 교육과정 영역 및 성취기준
+# 교육과정 데이터
 curriculum_standards = {
     "중학교": {
         "듣기·말하기": [
@@ -167,18 +170,58 @@ curriculum_standards = {
     }
 }
 
+
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 루브릭을 생성합니다."},
+                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
             ]
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"오류가 발생했습니다: {str(e)}"
+
+def generate_rubric_table(criteria_list):
+    rubric_data = {}
+    for criteria in criteria_list:
+        prompt = f"""
+        다음 평가 기준에 대한 서술식 5단계 루브릭을 작성해주세요:
+        
+        평가 기준: {criteria}
+        
+        각 항목에 대해 긍정적인 표현을 사용하여 설명하고, 최상, 상, 중, 하, 최하 순으로, 진술을 더 상세하고 길게 작성해주세요.
+        """
+
+        rubric_text = get_gpt_response(prompt)
+        rubric_data[criteria] = rubric_text.splitlines()
+
+    return rubric_data
+
+def create_pdf(rubric_data):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+
+    for criteria, descriptions in rubric_data.items():
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(200, 10, txt=criteria, ln=True, align='C')
+
+        pdf.set_font("Arial", size=12)
+        pdf.cell(40, 10, txt="레벨", border=1)
+        pdf.cell(150, 10, txt="설명", border=1, ln=True)
+
+        levels = ["최상", "상", "중", "하", "최하"]
+        for level, description in zip(levels, descriptions):
+            pdf.cell(40, 10, txt=level, border=1)
+            pdf.multi_cell(150, 10, txt=description, border=1)
+
+        pdf.ln(10)
+
+    return pdf
 
 def main():
     st.title("루브릭 생성기")
@@ -205,24 +248,28 @@ def main():
         if len(criteria_list) == 0:
             st.warning("최소한 하나의 평가 기준을 입력해주세요.")
         else:
-            prompt = f"""
-            다음 정보를 바탕으로 국어 교육과정을 위한 루브릭을 작성해주세요:
-            
-            수업 정보:
-            - 학교급: {school_level}
-            - 과목: {subject}
-            - 성취기준: {standard}
-            - 활동: {activity}
-            
-            평가 기준:
-            {', '.join(criteria_list)}
-            
-            각 항목에 대한 5단계 서술식 루브릭을 작성해주세요. 긍정적인 표현을 사용하고, '최상', '상', '중', '하', '최하'로 구분된 5x5 표 형식으로 제시해주세요.
-            """
-
-            rubric = get_gpt_response(prompt)
+            rubric_data = generate_rubric_table(criteria_list)
             st.markdown("## 생성된 루브릭")
-            st.markdown(rubric)
+
+            for criteria, descriptions in rubric_data.items():
+                st.markdown(f"### {criteria}")
+                df = pd.DataFrame({
+                    "레벨": ["최상", "상", "중", "하", "최하"],
+                    "설명": descriptions
+                })
+                st.table(df)
+
+            pdf = create_pdf(rubric_data)
+            pdf_buffer = BytesIO()
+            pdf.output(pdf_buffer)
+            pdf_buffer.seek(0)
+
+            st.download_button(
+                label="PDF 다운로드",
+                data=pdf_buffer,
+                file_name="rubric.pdf",
+                mime="application/pdf"
+            )
 
 if __name__ == "__main__":
     main()
