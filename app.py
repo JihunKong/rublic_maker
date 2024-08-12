@@ -251,7 +251,7 @@ def main():
         else:
             criteria_list = fill_missing_criteria(criteria_list)
             with st.spinner('루브릭을 생성 중입니다...'):
-                markdown_table = generate_rubric_table(criteria_list)
+                 markdown_table = generate_rubric_table(criteria_list)
             
             st.markdown("## 생성된 루브릭")
             st.markdown(markdown_table)
