@@ -7,7 +7,6 @@ from fpdf import FPDF
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
 
-# 교육과정 데이터
 curriculum_standards = {
     "중학교": {
         "듣기·말하기": [
@@ -176,7 +175,7 @@ def get_gpt_response(prompt):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 낮은 수준에도 노력한다면 발전이 기대된다 등의 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
+                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 하, 최하의 척도에도 발전이 기대된다. 노력이 필요하다 등의 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -192,13 +191,37 @@ def generate_rubric_table(criteria_list):
         
         평가 기준: {criteria}
         
-        각 항목에 대해 긍정적인 표현을 사용하여 설명하고, 최상, 상, 중, 하, 최하 순으로, 진술을 더 상세하고 길게 작성해주세요. 만약 사용자가 5개 미만으로 작성한 경우 나머지 항목을 추가로 만들어서 작성하세요.
+        각 항목에 대해 긍정적인 표현을 사용하여 설명하고, 최상, 상, 중, 하, 최하 순으로, 진술을 더 상세하고 길게 작성해주세요.
         """
 
         rubric_text = get_gpt_response(prompt)
-        rubric_data[criteria] = rubric_text.splitlines()
+        descriptions = rubric_text.splitlines()
+        
+        # 정확히 5개의 설명이 제공되지 않았다면 기본 메시지로 채우기
+        levels = ["최상", "상", "중", "하", "최하"]
+        if len(descriptions) != 5:
+            descriptions = descriptions[:5] + ["(설명이 부족합니다. 여기에 추가 설명을 작성하십시오.)"] * (5 - len(descriptions))
+
+        rubric_data[criteria] = descriptions
 
     return rubric_data
+
+def fill_missing_criteria(criteria_list, total_criteria=5):
+    if len(criteria_list) < total_criteria:
+        missing_count = total_criteria - len(criteria_list)
+        st.info(f"입력되지 않은 평가 기준 {missing_count}개는 자동으로 생성됩니다.")
+        
+        prompt = f"""
+        사용자가 입력하지 않은 평가 기준을 자동으로 생성해주세요. 현재 입력된 기준은 다음과 같습니다:
+        {', '.join(criteria_list)}
+        
+        부족한 평가 기준을 채우기 위해, 추가로 {missing_count}개의 평가 기준을 생성해주세요.
+        """
+
+        gpt_generated_criteria = get_gpt_response(prompt).splitlines()
+        criteria_list.extend([criteria for criteria in gpt_generated_criteria if criteria])
+
+    return criteria_list[:total_criteria]  # Ensure the list is exactly the required length
 
 def create_pdf(rubric_data):
     pdf = FPDF()
@@ -248,7 +271,9 @@ def main():
         if len(criteria_list) == 0:
             st.warning("최소한 하나의 평가 기준을 입력해주세요.")
         else:
-            rubric_data = generate_rubric_table(criteria_list)
+            criteria_list = fill_missing_criteria(criteria_list)
+            with st.spinner('루브릭을 생성 중입니다...'):
+                rubric_data = generate_rubric_table(criteria_list)
             st.markdown("## 생성된 루브릭")
 
             for criteria, descriptions in rubric_data.items():
