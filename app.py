@@ -170,11 +170,10 @@ curriculum_standards = {
     }
 }
 
-
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
@@ -186,16 +185,16 @@ def get_gpt_response(prompt):
 
 def generate_rubric_table(criteria_list):
     prompt = f"""
-    다음 평가 기준들에 대한 루브릭 표를 작성해주세요:
+    다음 5개의 평가 기준에 대한 루브릭 표를 작성해주세요:
     
     {', '.join(criteria_list)}
     
     루브릭 표는 다음 형식을 따라야 합니다:
-    1. 첫 번째 열은 평가 기준입니다.
-    2. 나머지 열은 '최상', '상', '중', '하', '최하' 순서로 평가 척도를 나타냅니다.
+    1. 첫 번째 행은 열 제목으로, '평가 기준', '최상', '상', '중', '하', '최하'를 포함해야 합니다.
+    2. 그 다음 5개의 행은 각각 하나의 평가 기준에 대한 내용을 포함해야 합니다.
     3. 각 셀에는 해당 평가 기준과 척도에 맞는 상세한 설명을 작성해주세요.
     4. 표는 마크다운 형식으로 작성해주세요.
-    5. 모든 평가 기준과 척도에 대해 빠짐없이 작성해주세요.
+    5. 모든 5개의 평가 기준과 5개의 척도에 대해 빠짐없이 작성해주세요.
     
     긍정적인 표현을 사용하여 각 항목을 상세하고 길게 설명해주세요.
     """
@@ -227,7 +226,7 @@ def fill_missing_criteria(criteria_list, total_criteria=5):
         gpt_generated_criteria = get_gpt_response(prompt).splitlines()
         criteria_list.extend([criteria for criteria in gpt_generated_criteria if criteria])
 
-    return criteria_list[:total_criteria]  # Ensure the list is exactly the required length
+    return criteria_list[:total_criteria]  # Ensure the list is exactly 5 criteria
 
 def main():
     st.title("루브릭 생성기")
@@ -241,14 +240,10 @@ def main():
     activity = st.text_area("활동 입력", "예: 설득력 있는 글쓰기")
 
     # 평가 기준 입력
-    st.subheader("평가 기준 입력 (최대 5개)")
-    criteria1 = st.text_input("평가 기준 1", "")
-    criteria2 = st.text_input("평가 기준 2", "")
-    criteria3 = st.text_input("평가 기준 3", "")
-    criteria4 = st.text_input("평가 기준 4", "")
-    criteria5 = st.text_input("평가 기준 5", "")
+    st.subheader("평가 기준 입력 (정확히 5개)")
+    criteria_inputs = [st.text_input(f"평가 기준 {i+1}", "") for i in range(5)]
 
-    criteria_list = [criteria for criteria in [criteria1, criteria2, criteria3, criteria4, criteria5] if criteria]
+    criteria_list = [criteria for criteria in criteria_inputs if criteria]
 
     if st.button("루브릭 생성"):
         if len(criteria_list) == 0:
