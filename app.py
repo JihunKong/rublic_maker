@@ -174,9 +174,9 @@ curriculum_standards = {
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
-                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
+                {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 낮은 수준에도 노력한다면 발전이 기대된다 등의 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -192,7 +192,7 @@ def generate_rubric_table(criteria_list):
         
         평가 기준: {criteria}
         
-        각 항목에 대해 긍정적인 표현을 사용하여 설명하고, 최상, 상, 중, 하, 최하 순으로, 진술을 더 상세하고 길게 작성해주세요.
+        각 항목에 대해 긍정적인 표현을 사용하여 설명하고, 최상, 상, 중, 하, 최하 순으로, 진술을 더 상세하고 길게 작성해주세요. 만약 사용자가 5개 미만으로 작성한 경우 나머지 항목을 추가로 만들어서 작성하세요.
         """
 
         rubric_text = get_gpt_response(prompt)
