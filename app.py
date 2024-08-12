@@ -3,7 +3,7 @@ from openai import OpenAI
 import json
 from io import BytesIO
 import re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # BeautifulSoup 임포트
 
 # OpenAI API 키 설정
 client = OpenAI(api_key=st.secrets["openai"]["api_key"])
@@ -171,12 +171,11 @@ curriculum_standards = {
     }
 }
 
-
 # GPT 응답 가져오기 함수
 def get_gpt_response(prompt):
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4",
             messages=[
                 {"role": "system", "content": "당신은 교육 전문가입니다. 사용자가 입력한 정보에 따라 긍정적인 표현을 사용하여 평가 루브릭을 작성합니다."},
                 {"role": "user", "content": prompt}
@@ -206,8 +205,6 @@ def generate_rubric_table(criteria_list):
 
 # HTML 표에서 데이터를 JSON으로 변환하는 함수
 def parse_html_table_to_json(html_table):
-    from bs4 import BeautifulSoup
-
     soup = BeautifulSoup(html_table, "html.parser")
     headers = [header.text.strip() for header in soup.find_all('th')]
     rows = soup.find_all('tr')[1:]  # 첫 번째 행은 헤더이므로 제외
@@ -247,7 +244,7 @@ def main():
     standard = st.selectbox("교육과정 성취기준 선택", curriculum_standards[school_level][subject])
 
     # 활동 입력
-    activity = st.text_area("활동 입력", "예: 설득력 있는 글쓰기")
+    activity = st.text_area("학습 목표", "예: 공감적 대화하기의 요소를 이해하고 일상 생활에 적용할 수 있다.")
 
     # 평가 기준 입력
     st.subheader("평가 기준 입력")
